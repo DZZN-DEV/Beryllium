@@ -41,7 +41,6 @@ private const val SERVER_PORT = 8899
 private const val LAST_WATCHED_STATION_ID = "last_watched_station_id"
 
 class MainActivity : AppCompatActivity(), AnalyticsListener {
-    // Deklariere eine Variable für SharedPreferences
     private lateinit var sharedPref: SharedPreferences
 
     private val andServer by lazy {
@@ -96,7 +95,6 @@ class MainActivity : AppCompatActivity(), AnalyticsListener {
         player.addAnalyticsListener(this)
 
         andServer.startup()
-        //start server
         lifecycleScope.launchWhenCreated {
             while (!isDestroyed) {
                 if (!andServer.isRunning) {
@@ -110,34 +108,26 @@ class MainActivity : AppCompatActivity(), AnalyticsListener {
                 }
                 val ip4String = intToIP(ip)
                 configPageUrl = "http://$ip4String:$SERVER_PORT/index.html"
-                //QR code
                 delay(5000)
             }
         }
-        //inject initial data
+
         lifecycleScope.launchWhenCreated {
             if (BuildConfig.DEBUG) db.tvStationDao().clear()
             val savedStations = db.tvStationDao().getAll()
             if (savedStations.isEmpty()) {
                 val defaultStations = withContext(Dispatchers.IO) {
-                    @Suppress("BlockingMethodInNonBlockingContext")
-                    val defaultStationsJson =
-                        String(assets.open("default_tv_stations.json").readBytes())
+                    val defaultStationsJson = String(assets.open("default_tv_stations.json").readBytes())
                     gson.fromJson<Array<TVStation>>(defaultStationsJson)
                 }
                 db.tvStationDao().insert(*defaultStations)
             }
             changeStation(true)
         }
-        // Initialisiere SharedPreferences
+
         sharedPref = getPreferences(Context.MODE_PRIVATE)
-
-        // Lade die zuletzt angesehene Sender-ID
         val lastWatchedStationId = sharedPref.getInt(LAST_WATCHED_STATION_ID, -1)
-
-        // Hier kannst du die zuletzt angesehene Sender-ID verwenden, um den Sender zu laden oder andere Aktionen auszuführen
         if (lastWatchedStationId != -1) {
-            // Finde den Sender mit der gespeicherten ID und lade ihn
             val lastWatchedStation = db.tvStationDao().getById(lastWatchedStationId)
             currentStation = lastWatchedStation
         }
@@ -174,7 +164,6 @@ class MainActivity : AppCompatActivity(), AnalyticsListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Speichere die zuletzt angesehene Sender-ID, wenn die App zerstört wird
         currentStation?.id?.let { id ->
             with(sharedPref.edit()) {
                 putInt(LAST_WATCHED_STATION_ID, id)
@@ -225,21 +214,25 @@ class MainActivity : AppCompatActivity(), AnalyticsListener {
             longToast(R.string.no_saved_stations)
             return
         }
-        val uri = Uri.parse(currentStation.m3u8)
-        val type = Util.inferContentType(uri)
-        val ms = when (type) {
-            C.TYPE_DASH -> DashMediaSource.Factory(dataSourceFactory)
-            C.TYPE_HLS -> HlsMediaSource.Factory(dataSourceFactory)
-            C.TYPE_SS -> SsMediaSource.Factory(dataSourceFactory)
-            C.TYPE_OTHER -> ProgressiveMediaSource.Factory(dataSourceFactory)
-            else -> {
-                toast(str(R.string.fmt_unsupported_content_type, type.toString()))
-                return
-            }
-        }.createMediaSource(MediaItem.fromUri(uri))
-        player.setMediaSource(ms)
-        player.prepare()
-        player.playWhenReady = true
+        try {
+            val uri = Uri.parse(currentStation.m3u8)
+            val type = Util.inferContentType(uri)
+            val ms = when (type) {
+                C.TYPE_DASH -> DashMediaSource.Factory(dataSourceFactory)
+                C.TYPE_HLS -> HlsMediaSource.Factory(dataSourceFactory)
+                C.TYPE_SS -> SsMediaSource.Factory(dataSourceFactory)
+                C.TYPE_OTHER -> ProgressiveMediaSource.Factory(dataSourceFactory)
+                else -> {
+                    toast(str(R.string.fmt_unsupported_content_type, type.toString()))
+                    return
+                }
+            }.createMediaSource(MediaItem.fromUri(uri))
+            player.setMediaSource(ms)
+            player.prepare()
+            player.playWhenReady = true
+        } catch (e: Exception) {
+            toast("Error loading media: ${e.message}")
+        }
     }
 
     override fun onPlaybackStateChanged(eventTime: AnalyticsListener.EventTime, state: Int) {
