@@ -1,6 +1,7 @@
 # TV Station Management
 * http://[yourAndroidTVIp]:8899/
 
+
 # TV Station Management API
 * http://`your Android TV IP`:8899/tvStation
 * Supported methods GET POST PUT DELETE
