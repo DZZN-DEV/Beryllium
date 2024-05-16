@@ -1,5 +1,7 @@
 package com.londonx.be.tv
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
@@ -36,8 +38,12 @@ import splitties.views.textResource
 import java.util.concurrent.TimeUnit
 
 private const val SERVER_PORT = 8899
+private const val LAST_WATCHED_STATION_ID = "last_watched_station_id"
 
 class MainActivity : AppCompatActivity(), AnalyticsListener {
+    // Deklariere eine Variable für SharedPreferences
+    private lateinit var sharedPref: SharedPreferences
+
     private val andServer by lazy {
         AndServer.webServer(this)
             .port(SERVER_PORT)
@@ -123,6 +129,18 @@ class MainActivity : AppCompatActivity(), AnalyticsListener {
             }
             changeStation(true)
         }
+        // Initialisiere SharedPreferences
+        sharedPref = getPreferences(Context.MODE_PRIVATE)
+
+        // Lade die zuletzt angesehene Sender-ID
+        val lastWatchedStationId = sharedPref.getInt(LAST_WATCHED_STATION_ID, -1)
+
+        // Hier kannst du die zuletzt angesehene Sender-ID verwenden, um den Sender zu laden oder andere Aktionen auszuführen
+        if (lastWatchedStationId != -1) {
+            // Finde den Sender mit der gespeicherten ID und lade ihn
+            val lastWatchedStation = db.tvStationDao().getById(lastWatchedStationId)
+            currentStation = lastWatchedStation
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -156,6 +174,13 @@ class MainActivity : AppCompatActivity(), AnalyticsListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Speichere die zuletzt angesehene Sender-ID, wenn die App zerstört wird
+        currentStation?.id?.let { id ->
+            with(sharedPref.edit()) {
+                putInt(LAST_WATCHED_STATION_ID, id)
+                apply()
+            }
+        }
         andServer.shutdown()
         player.release()
     }
